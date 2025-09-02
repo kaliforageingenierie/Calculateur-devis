@@ -11,6 +11,17 @@ body {
     margin: 20px;
     max-width: 750px;
     background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), #139191;
+    transition: all 0.3s ease;
+}
+body.mobile {
+    max-width: 100%;
+    margin: 5px;
+    font-size: 1.1em;
+}
+body.mobile input, body.mobile button {
+    width: 100%;
+    font-size: 1.2em;
+    padding: 10px;
 }
 .header {
     display: flex;
@@ -39,8 +50,9 @@ button { margin-top: 15px; padding: 10px 15px; cursor: pointer; font-weight: bol
 .result { margin-top: 25px; white-space: pre-line; font-weight: bold; }
 .subsection { border:1px solid #ccc; padding:10px; margin-top:15px; border-radius:5px; background: rgba(255,255,255,0.1); }
 .subsection h3 { margin-top:0; }
-a { color: #36E1EB; text-decoration: underline; } /* bleu désaturé */
+a { color: #000080; text-decoration: underline; } /* bleu navy */
 .alert-hors-perimetre { color: #800000; display:block; margin-top:5px; } /* rouge bordeaux */
+.view-buttons { display:flex; gap:10px; margin-bottom:15px; }
 </style>
 </head>
 <body>
@@ -51,6 +63,11 @@ a { color: #36E1EB; text-decoration: underline; } /* bleu désaturé */
         <h2>Calculateur approximatif de devis -</h2>
         <h3>Tarifs EDS KALIFORAGE INGENIERIE</h3>
     </div>
+</div>
+
+<div class="view-buttons">
+<button type="button" onclick="setView('pc')">Vue PC</button>
+<button type="button" onclick="setView('mobile')">Vue mobile</button>
 </div>
 
 <label>Point GPS décimal (lat, lon) :
@@ -67,7 +84,7 @@ a { color: #36E1EB; text-decoration: underline; } /* bleu désaturé */
 
 <div class="checkbox">
 <input type="checkbox" id="rapportUrgent">
-<label for="rapportUrgent">Rapport urgent (<2 semaines entre commande et remise)</label>
+<label for="rapportUrgent">Rapport urgent</label>
 </div>
 
 <div class="checkbox">
@@ -80,6 +97,14 @@ a { color: #36E1EB; text-decoration: underline; } /* bleu désaturé */
 <div class="result" id="resultat"></div>
 
 <script>
+function setView(mode){
+    if(mode === 'mobile'){
+        document.body.classList.add('mobile');
+    } else {
+        document.body.classList.remove('mobile');
+    }
+}
+
 document.getElementById("calc").addEventListener("click", async () => {
   const pointGPS = document.getElementById("pointGPS").value.trim();
   const largeur = parseFloat(document.getElementById("largeur").value);
@@ -99,10 +124,8 @@ document.getElementById("calc").addEventListener("click", async () => {
   }
   const [lat, lon] = parts;
 
-  // Calcul surface
   const surface = largeur*longueur;
 
-  // Nombre de sondages selon fourchettes max
   let nbSondages;
   if(surface <= 600) nbSondages = 4;
   else if(surface <= 700) nbSondages = 5;
@@ -116,7 +139,6 @@ document.getElementById("calc").addEventListener("click", async () => {
 
   const prixSondagesHT = nbSondages*150;
 
-  // Type de rapport
   let typeRapport;
   if(urgent) typeRapport = "Urgent";
   else typeRapport = nbSondages <=5 ? "5 sondages ou moins" : (nbSondages <=8 ? "6 à 8 sondages" : "Plus de 8 sondages");
@@ -125,7 +147,6 @@ document.getElementById("calc").addEventListener("click", async () => {
   const prixCartoHT = 150;
   const prixStabiliteHT = stabilite ? 150 : 0;
 
-  // OpenRouteService API
   const apiKey = "5b3ce3597851110001cf6248636d5553a53f45fbbecbc358e48d492f";
   const start = `${lon},${lat}`;
   const end = "4.855992785403988,46.78110096678826";
@@ -147,7 +168,6 @@ document.getElementById("calc").addEventListener("click", async () => {
     const m = Math.round(durationMin - h*60);
     dureeStr = `${h}h${m.toString().padStart(2,'0')}min`;
 
-    // Tarif distance
     if(distanceKm<=40) tarifDistanceHT=70;
     else if(distanceKm<=80) tarifDistanceHT=110;
     else if(distanceKm<=120 || (distanceKm>120 && nbSondages>6)) tarifDistanceHT=150;
@@ -167,7 +187,7 @@ document.getElementById("calc").addEventListener("click", async () => {
     `Surface calculée : ${surface.toFixed(2)} m²\n\n`+
     `--- Prestation sur site ---\n`+
     `Distance et trajet d'amené repli des machines : ${distanceKm!== "-" ? distanceKm.toFixed(2)+" km / "+dureeStr : "Erreur"}`+
-    `${(distanceKm>120 && nbSondages<6) ? "<span class='alert-hors-perimetre'>Chantier hors périmètre : intervention toutefois possible sous condition (commande groupée, augmentation de la quantité de sondage, etc.) A vérifier directement avec la société.</span>" : ""}\n`+
+    `${(distanceKm>120 && nbSondages<6) ? "<span class='alert-hors-perimetre'>\nChantier hors périmètre : intervention toutefois possible sous condition (commande groupée, augmentation de la quantité de sondage, etc.) A vérifier directement avec la société.</span>" : ""}\n`+
     `Nombre de sondages minimal requis : ${nbSondages}\n`+
     `Prix sondages : ${prixSondagesHT.toFixed(2)} € HT\n`+
     `Tarif distance : ${tarifDistanceHT.toFixed(2)} € HT\n\n`+
