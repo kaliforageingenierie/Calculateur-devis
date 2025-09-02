@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Calculateur approximatif de devis - Tarifs EDS KALIFORAGE INGENIERIE</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    color: #fff;
+    margin: 20px;
+    max-width: 750px;
+    background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), #139191;
+}
+.header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+.header img {
+    height: 60px;
+}
+.header-text {
+    display: flex;
+    flex-direction: column;
+}
+.header-text h2 {
+    margin: 0;
+}
+.header-text h3 {
+    margin: 0;
+    font-weight: normal;
+}
+label { display:block; margin-top: 10px; }
+input[type=text], input[type=number] { margin-top: 5px; padding:5px; width: 100%; box-sizing: border-box; font-weight: bold; }
+.checkbox { display:flex; align-items:center; gap:10px; margin-top:10px; }
+button { margin-top: 15px; padding: 10px 15px; cursor: pointer; font-weight: bold; }
+.result { margin-top: 25px; white-space: pre-line; font-weight: bold; }
+.subsection { border:1px solid #ccc; padding:10px; margin-top:15px; border-radius:5px; background: rgba(255,255,255,0.1); }
+.subsection h3 { margin-top:0; }
+a { color: #36E1EB; text-decoration: underline; } /* bleu désaturé */
+.alert-hors-perimetre { color: #800000; display:block; margin-top:5px; } /* rouge bordeaux */
+</style>
+</head>
+<body>
+
+<div class="header">
+    <img src="https://custom-images.strikinglycdn.com/res/hrscywv4p/image/upload/c_limit,fl_lossy,h_300,w_300,f_auto,q_auto/945405/23998_949793.png" alt="Logo KALIFORAGE">
+    <div class="header-text">
+        <h2>Calculateur approximatif de devis -</h2>
+        <h3>Tarifs EDS KALIFORAGE INGENIERIE</h3>
+    </div>
+</div>
+
+<label>Point GPS décimal (lat, lon) :
+  <input type="text" id="pointGPS" placeholder="Ex: 46.923171 , 4.994141">
+</label>
+
+<label>Largeur effective du bâtiment (m) :
+  <input type="number" id="largeur" step="0.1">
+</label>
+
+<label>Longueur effective du bâtiment (m) :
+  <input type="number" id="longueur" step="0.1">
+</label>
+
+<div class="checkbox">
+<input type="checkbox" id="rapportUrgent">
+<label for="rapportUrgent">Rapport urgent (<2 semaines entre commande et remise)</label>
+</div>
+
+<div class="checkbox">
+<input type="checkbox" id="stabilite">
+<label for="stabilite">Pente ou hauteur des talus significative : étude de stabilité des pentes souhaitée</label>
+</div>
+
+<button id="calc">Calculer devis</button>
+
+<div class="result" id="resultat"></div>
+
+<script>
+document.getElementById("calc").addEventListener("click", async () => {
+  const pointGPS = document.getElementById("pointGPS").value.trim();
+  const largeur = parseFloat(document.getElementById("largeur").value);
+  const longueur = parseFloat(document.getElementById("longueur").value);
+  const urgent = document.getElementById("rapportUrgent").checked;
+  const stabilite = document.getElementById("stabilite").checked;
+
+  if(!pointGPS || isNaN(largeur) || isNaN(longueur)){
+    alert("Remplir toutes les données correctement.");
+    return;
+  }
+
+  const parts = pointGPS.split(",").map(s => parseFloat(s.trim()));
+  if(parts.length !== 2 || parts.some(isNaN)){
+    alert("Point GPS invalide. Format attendu : 46.923171 , 4.994141");
+    return;
+  }
+  const [lat, lon] = parts;
+
+  // Calcul surface
+  const surface = largeur*longueur;
+
+  // Nombre de sondages selon fourchettes max
+  let nbSondages;
+  if(surface <= 600) nbSondages = 4;
+  else if(surface <= 700) nbSondages = 5;
+  else if(surface <= 800) nbSondages = 6;
+  else if(surface <= 1750) nbSondages = 7;
+  else if(surface <= 2450) nbSondages = 8;
+  else if(surface <= 2800) nbSondages = 9;
+  else if(surface <= 2975) nbSondages = 10;
+  else if(surface <= 3150) nbSondages = 11;
+  else nbSondages = 11;
+
+  const prixSondagesHT = nbSondages*150;
+
+  // Type de rapport
+  let typeRapport;
+  if(urgent) typeRapport = "Urgent";
+  else typeRapport = nbSondages <=5 ? "5 sondages ou moins" : (nbSondages <=8 ? "6 à 8 sondages" : "Plus de 8 sondages");
+
+  const prixRapportHT = urgent||nbSondages>8 ? 385 : (nbSondages>=6 ? 335 : 285);
+  const prixCartoHT = 150;
+  const prixStabiliteHT = stabilite ? 150 : 0;
+
+  // OpenRouteService API
+  const apiKey = "5b3ce3597851110001cf6248636d5553a53f45fbbecbc358e48d492f";
+  const start = `${lon},${lat}`;
+  const end = "4.855992785403988,46.78110096678826";
+
+  let tarifDistanceHT=0;
+  let distanceKm=null;
+  let dureeStr = "";
+  try {
+    const res = await fetch(`https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${start}&end=${end}`);
+    if(!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+    const data = await res.json();
+    if(!data.features || !data.features[0] || !data.features[0].properties.segments || !data.features[0].properties.segments[0]) 
+      throw new Error("Structure JSON inattendue");
+
+    const segment = data.features[0].properties.segments[0];
+    distanceKm = segment.distance/1000;
+    const durationMin = segment.duration/60;
+    const h = Math.floor(durationMin/60);
+    const m = Math.round(durationMin - h*60);
+    dureeStr = `${h}h${m.toString().padStart(2,'0')}min`;
+
+    // Tarif distance
+    if(distanceKm<=40) tarifDistanceHT=70;
+    else if(distanceKm<=80) tarifDistanceHT=110;
+    else if(distanceKm<=120 || (distanceKm>120 && nbSondages>6)) tarifDistanceHT=150;
+    else if(distanceKm>121 && nbSondages<=6) tarifDistanceHT=230;
+
+  } catch(e){
+    dureeStr = "-";
+    distanceKm = "-";
+    tarifDistanceHT = 0;
+  }
+
+  const totalHT = prixSondagesHT + prixRapportHT + prixCartoHT + prixStabiliteHT + tarifDistanceHT;
+  const TVA = 0.2;
+  const totalTTC = totalHT*(1+TVA);
+
+  document.getElementById("resultat").innerHTML =
+    `Surface calculée : ${surface.toFixed(2)} m²\n\n`+
+    `--- Prestation sur site ---\n`+
+    `Distance et trajet d'amené repli des machines : ${distanceKm!== "-" ? distanceKm.toFixed(2)+" km / "+dureeStr : "Erreur"}`+
+    `${(distanceKm>120 && nbSondages<6) ? "<span class='alert-hors-perimetre'>Chantier hors périmètre : intervention toutefois possible sous condition (commande groupée, augmentation de la quantité de sondage, etc.) A vérifier directement avec la société.</span>" : ""}\n`+
+    `Nombre de sondages minimal requis : ${nbSondages}\n`+
+    `Prix sondages : ${prixSondagesHT.toFixed(2)} € HT\n`+
+    `Tarif distance : ${tarifDistanceHT.toFixed(2)} € HT\n\n`+
+    `--- Ingénierie géotechnique ---\n`+
+    `Étude cartographique : ${prixCartoHT.toFixed(2)} € HT\n`+
+    `Prix rapport : ${prixRapportHT.toFixed(2)} € HT (${typeRapport})\n`+
+    `Étude de stabilité : ${prixStabiliteHT.toFixed(2)} € HT\n\n`+
+    `Total HT : ${totalHT.toFixed(2)} €\n`+
+    `TVA 20% : ${(totalHT*TVA).toFixed(2)} €\n`+
+    `Total TTC : ${totalTTC.toFixed(2)} €\n\n`+
+    `Remarque importante : Prix non contractuel donné à titre informatif. N'hésitez pas à nous contacter sur <a href="mailto:kaliforageingenierie@gmail.com">kaliforageingenierie@gmail.com</a> pour toute demande de devis ou question.`;
+});
+</script>
+</body>
+</html>
