@@ -52,11 +52,24 @@ input[type=text], input[type=number], button {
     font-size: 1em;
 }
 
+/* Correction pour alignement parfait des cases à cocher */
 .checkbox {
-    display:flex; 
-    flex-direction: column; 
-    gap:10px; 
-    margin-top:10px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.checkbox input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.checkbox label {
+    margin: 0;
+    font-weight: bold;
+    word-break: break-word;
 }
 
 button {
