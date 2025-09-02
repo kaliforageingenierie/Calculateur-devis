@@ -52,12 +52,11 @@ input[type=text], input[type=number], button {
     font-size: 1em;
 }
 
-/* Correction pour alignement parfait des cases à cocher */
+/* Cases à cocher parfaitement alignées */
 .checkbox {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: 10px;
+    display: flex;
+    align-items: center;  /* centre verticalement case et label */
+    gap: 10px;            /* espace entre case et label */
     margin-top: 10px;
 }
 
@@ -67,8 +66,8 @@ input[type=text], input[type=number], button {
 }
 
 .checkbox label {
+    flex: 1;              /* prend tout l’espace restant */
     margin: 0;
-    font-weight: bold;
     word-break: break-word;
 }
 
